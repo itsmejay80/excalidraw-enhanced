@@ -1,0 +1,8 @@
+node_modules/
+dist/
+
+# Keep reproducible installs; the parent repo ignores npm lockfiles.
+!package-lock.json
+.env
+.env.*
+data/
