@@ -1,13 +1,34 @@
-# Excalidraw Workspace
+# Excalidraw Enhanced
 
-A self-hosted canvas library with named drawings, autosave, light/dark themes,
-and MCP tools that target a specific canvas. The workspace application lives in
-[`canvas-workspace/`](./canvas-workspace/README.md); start there for setup,
-deployment, and verification.
+My personal fork of [Excalidraw](https://github.com/excalidraw/excalidraw),
+with enhancements I added for my own workflow and for self-hosting on my
+personal VPS.
 
-This repository includes an Excalidraw source snapshot based on upstream commit
-`701b901`. It is an independent project, distributed under the [MIT license](./LICENSE).
-The adapted MCP editor retains its [upstream license](./canvas-workspace/frontend/vendor/LICENSE).
+I wanted a single place to keep multiple drawings, reopen them from any of my
+devices, and let MCP clients work with a specific canvas. This fork adds a
+self-hosted workspace around the Excalidraw editor:
+
+- **Canvas library:** create, name, search, rename, archive, and restore drawings.
+- **Persistent drawings:** each canvas has its own URL, saved scene, images,
+  and snapshots, with autosave and live updates.
+- **Canvas-specific MCP tools:** create and select canvases explicitly so AI
+  clients can work on separate drawings.
+- **Drawing imports:** bring in `.excalidraw` files or a previous browser drawing.
+- **Shared appearance:** a saved light/dark preference across the library and editor.
+- **More drawing space:** a compact canvas header with an integrated save indicator.
+- **Personal deployment:** configurable storage paths, a systemd deployment
+  script, versioned releases, backups, and private access through Tailscale.
+
+The workspace application lives in
+[`canvas-workspace/`](./canvas-workspace/README.md). See its README for setup,
+configuration, deployment, and tests. These additions reflect my personal
+setup; you can adapt them for your own VPS or self-hosted environment.
+
+This fork starts from an Excalidraw source snapshot at upstream commit
+`701b901`. The canvas engine and adapted editor build on
+[yctimlin/mcp_excalidraw](https://github.com/yctimlin/mcp_excalidraw).
+The project retains the [MIT license](./LICENSE) and the adapted editor's
+[upstream license](./canvas-workspace/frontend/vendor/LICENSE).
 
 The original Excalidraw documentation follows.
 

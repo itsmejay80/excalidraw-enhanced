@@ -1,4 +1,9 @@
-# Canvas workspace
+# Excalidraw Enhanced workspace
+
+Part of my personal [Excalidraw fork](https://github.com/itsmejay80/excalidraw-enhanced).
+I added this workspace for my own drawing and MCP workflows, with deployment
+on my personal VPS in mind. The configuration and deployment script reflect
+that setup and can be adapted to your own server.
 
 A self-hosted library of named Excalidraw drawings. Each canvas has a permanent
 `/c/<id>` URL, its own saved scene, images, snapshots, and live browser updates.
