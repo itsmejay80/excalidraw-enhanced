@@ -4,6 +4,15 @@ My personal fork of [Excalidraw](https://github.com/excalidraw/excalidraw),
 with enhancements I added for my own workflow and for self-hosting on my
 personal VPS.
 
+## Quick demo
+
+[![Excalidraw Enhanced demo: browse and search canvases, edit a drawing, switch themes, rename, and create a canvas](./docs/media/excalidraw-enhanced-demo.gif)](https://raw.githubusercontent.com/itsmejay80/excalidraw-enhanced/main/docs/media/excalidraw-enhanced-demo.mp4)
+
+A short walkthrough of the canvas library, editing, light/dark mode, autosave,
+renaming, and creating a new canvas. [Watch or download the MP4](https://raw.githubusercontent.com/itsmejay80/excalidraw-enhanced/main/docs/media/excalidraw-enhanced-demo.mp4).
+
+## What I added
+
 I wanted a single place to keep multiple drawings, reopen them from any of my
 devices, and let MCP clients work with a specific canvas. This fork adds a
 self-hosted workspace around the Excalidraw editor:
