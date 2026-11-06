@@ -1,0 +1,44 @@
+name: Canvas workspace
+
+on: pull_request
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CANVAS_ENGINE_SOURCE: ${{ github.workspace }}/.canvas-engine
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Check out the durable canvas engine
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: yctimlin/mcp_excalidraw
+          ref: 66b768b47914987bb77a49e1fd1922e7f6deb0fe
+          path: .canvas-engine
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.x
+      - name: Build the canvas engine
+        working-directory: .canvas-engine
+        run: |
+          npm ci
+          npm run build
+      - name: Install workspace dependencies and Chromium
+        working-directory: canvas-workspace
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Build the workspace
+        working-directory: canvas-workspace
+        run: npm run build
+      - name: Run workspace Node and browser tests
+        working-directory: canvas-workspace
+        run: |
+          CHROMIUM_PATH=$(node --input-type=module -e 'import { chromium } from "playwright"; process.stdout.write(chromium.executablePath());')
+          export CHROMIUM_PATH
+          npm test
