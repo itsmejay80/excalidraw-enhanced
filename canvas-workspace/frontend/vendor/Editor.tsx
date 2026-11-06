@@ -1,6 +1,6 @@
 // Adapted from yctimlin/mcp_excalidraw (MIT), commit 66b768b.
-import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Excalidraw,
   convertToExcalidrawElements,
@@ -9,21 +9,31 @@ import {
   exportToSvg,
   elementsOverlappingBBox,
   hashElementsVersion,
-  useHandleLibrary
-} from '@excalidraw/excalidraw'
-import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types'
-import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
+  useHandleLibrary,
+} from "@excalidraw/excalidraw";
+
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type {
   LibraryPersistedData,
-  LibraryPersistenceAdapter
-} from '@excalidraw/excalidraw/data/library'
-import { convertMermaidToExcalidraw, DEFAULT_MERMAID_CONFIG } from './utils/mermaidConverter'
-import { cleanElementForExcalidraw, prepareServerScene, assertScenePreserved } from './utils/scene'
-import { preloadCanvasFonts } from './utils/fonts'
-import type { ServerElement } from './utils/scene'
-import type { MermaidConfig } from '@excalidraw/mermaid-to-excalidraw'
+  LibraryPersistenceAdapter,
+} from "@excalidraw/excalidraw/data/library";
+import type { MermaidConfig } from "@excalidraw/mermaid-to-excalidraw";
 
-const LIBRARY_STORAGE_KEY = 'excalidraw-canvas-library'
+import {
+  convertMermaidToExcalidraw,
+  DEFAULT_MERMAID_CONFIG,
+} from "./utils/mermaidConverter";
+import {
+  cleanElementForExcalidraw,
+  prepareServerScene,
+  assertScenePreserved,
+} from "./utils/scene";
+import { preloadCanvasFonts } from "./utils/fonts";
+
+import type { ServerElement } from "./utils/scene";
+
+const LIBRARY_STORAGE_KEY = "excalidraw-canvas-library";
 
 /**
  * Persists the user's library in this browser.
@@ -37,23 +47,26 @@ const LIBRARY_STORAGE_KEY = 'excalidraw-canvas-library'
 const libraryAdapter: LibraryPersistenceAdapter = {
   load: () => {
     try {
-      const raw = window.localStorage?.getItem(LIBRARY_STORAGE_KEY)
-      return raw ? { libraryItems: JSON.parse(raw) } : null
+      const raw = window.localStorage?.getItem(LIBRARY_STORAGE_KEY);
+      return raw ? { libraryItems: JSON.parse(raw) } : null;
     } catch (error) {
-      console.warn('Failed to read library from localStorage:', error)
-      return null
+      console.warn("Failed to read library from localStorage:", error);
+      return null;
     }
   },
   save: (data: LibraryPersistedData) => {
     try {
-      window.localStorage?.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(data.libraryItems))
+      window.localStorage?.setItem(
+        LIBRARY_STORAGE_KEY,
+        JSON.stringify(data.libraryItems),
+      );
     } catch (error) {
       // Most likely the 5MB quota, which a large icon pack can exceed. The
       // library stays usable for this session; it just will not survive reload.
-      console.warn('Failed to save library to localStorage:', error)
+      console.warn("Failed to save library to localStorage:", error);
     }
-  }
-}
+  },
+};
 
 /**
  * Takes an element link (`?element=<id>`) out of the URL before Excalidraw mounts.
@@ -63,14 +76,17 @@ const libraryAdapter: LibraryPersistenceAdapter = {
  * "Linked object wasn't found". The link is resolved after the first scene loads.
  */
 const takeElementLink = (): string | null => {
-  const url = new URL(window.location.href)
-  if (!url.searchParams.has('element')) return null
-  const link = url.href
-  url.searchParams.delete('element')
-  window.history.replaceState(window.history.state, '', url)
-  return link
-}
-let pendingElementLink = typeof window === 'undefined' ? null : takeElementLink()
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("element")) {
+    return null;
+  }
+  const link = url.href;
+  url.searchParams.delete("element");
+  window.history.replaceState(window.history.state, "", url);
+  return link;
+};
+let pendingElementLink =
+  typeof window === "undefined" ? null : takeElementLink();
 
 // Type definitions
 type ExcalidrawAPIRefValue = ExcalidrawImperativeAPI;
@@ -87,7 +103,7 @@ interface ExportImageOptions {
 
 interface WebSocketMessage {
   type: string;
-  format?: 'png' | 'svg';
+  format?: "png" | "svg";
   background?: boolean;
   options?: ExportImageOptions;
   element?: ServerElement;
@@ -118,799 +134,1065 @@ interface ApiResponse {
   message?: string;
 }
 
-type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
-type SceneLoadStatus = 'loading' | 'ready' | 'failed';
+type SyncStatus = "idle" | "syncing" | "success" | "error";
+type SceneLoadStatus = "loading" | "ready" | "failed";
 const AUTO_SYNC_DEBOUNCE_MS = 500;
 const SCENE_MUTATIONS = new Set([
-  'element_created', 'element_updated', 'element_deleted', 'elements_batch_created'
+  "element_created",
+  "element_updated",
+  "element_deleted",
+  "elements_batch_created",
 ]);
 // Appearance is shared with the library and controlled by the workspace header.
 const UI_OPTIONS = { canvasActions: { toggleTheme: false } };
 
-export interface EditorHandle { flush: () => Promise<void> }
+export interface EditorHandle {
+  flush: () => Promise<void>;
+}
 
-const App = React.forwardRef<EditorHandle, { canvasId: string; theme: 'light' | 'dark'; statusContainer: HTMLDivElement | null }>(function Editor({ canvasId, theme, statusContainer }, ref): JSX.Element {
-  const appRef = useRef<HTMLDivElement>(null)
-  const apiBase = `/canvases/${encodeURIComponent(canvasId)}`
-  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null)
+const App = React.forwardRef<
+  EditorHandle,
+  {
+    canvasId: string;
+    theme: "light" | "dark";
+    statusContainer: HTMLDivElement | null;
+  }
+>(({ canvasId, theme, statusContainer }, ref): JSX.Element => {
+  const appRef = useRef<HTMLDivElement>(null);
+  const apiBase = `/canvases/${encodeURIComponent(canvasId)}`;
+  const [excalidrawAPI, setExcalidrawAPI] =
+    useState<ExcalidrawAPIRefValue | null>(null);
   // Ref so WS message handlers (captured in stale closures) always see the latest API instance
-  const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null)
+  const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   useEffect(() => {
-    excalidrawAPIRef.current = excalidrawAPI
-  }, [excalidrawAPI])
+    excalidrawAPIRef.current = excalidrawAPI;
+  }, [excalidrawAPI]);
 
   // Handles the `#addLibrary=...` callback that libraries.excalidraw.com sends
   // back after "Add to Excalidraw", and loads/saves the library through the
   // adapter above. Without this hook the Browse-libraries button opens the site
   // and correctly points it back here, but nothing receives what it returns —
   // the install silently does nothing.
-  useHandleLibrary({ excalidrawAPI, adapter: libraryAdapter })
-  const [isConnected, setIsConnected] = useState<boolean>(false)
-  const websocketRef = useRef<WebSocket | null>(null)
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useHandleLibrary({ excalidrawAPI, adapter: libraryAdapter });
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const websocketRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync state management
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
-  const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const syncInFlightRef = useRef<boolean>(false)
-  const suppressAutoSyncCountRef = useRef<number>(0)
-  const userInteractedRef = useRef<boolean>(false)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [, setLastSyncTime] = useState<Date | null>(null);
+  const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncInFlightRef = useRef<boolean>(false);
+  const suppressAutoSyncCountRef = useRef<number>(0);
+  const userInteractedRef = useRef<boolean>(false);
   // Version hash of the scene the server holds. Excalidraw calls onChange on
   // every re-render, including the one each sync causes, so autosync only
   // runs when the scene differs from this.
-  const serverSceneHashRef = useRef<number | null>(null)
+  const serverSceneHashRef = useRef<number | null>(null);
   // Image files the server already holds, so each sync uploads only new ones
-  const serverFileIdsRef = useRef<Set<string>>(new Set())
+  const serverFileIdsRef = useRef<Set<string>>(new Set());
   const rememberServerFiles = (files: unknown): void => {
-    const list = Array.isArray(files) ? files : Object.values((files as Record<string, unknown>) || {})
+    const list = Array.isArray(files)
+      ? files
+      : Object.values((files as Record<string, unknown>) || {});
     for (const file of list as { id?: unknown }[]) {
-      if (typeof file?.id === 'string') serverFileIdsRef.current.add(file.id)
+      if (typeof file?.id === "string") {
+        serverFileIdsRef.current.add(file.id);
+      }
     }
-  }
-  const [sceneLoadStatus, setSceneLoadStatus] = useState<SceneLoadStatus>('loading')
-  const sceneLoadStatusRef = useRef<SceneLoadStatus>('loading')
-  const sceneGenerationRef = useRef(0)
+  };
+  const [sceneLoadStatus, setSceneLoadStatus] =
+    useState<SceneLoadStatus>("loading");
+  const sceneLoadStatusRef = useRef<SceneLoadStatus>("loading");
+  const sceneGenerationRef = useRef(0);
 
-  const pauseSceneSync = (status: SceneLoadStatus = 'loading'): number => {
-    sceneGenerationRef.current += 1
-    sceneLoadStatusRef.current = status
-    setSceneLoadStatus(status)
+  const pauseSceneSync = (status: SceneLoadStatus = "loading"): number => {
+    sceneGenerationRef.current += 1;
+    sceneLoadStatusRef.current = status;
+    setSceneLoadStatus(status);
     if (autoSyncTimerRef.current) {
-      clearTimeout(autoSyncTimerRef.current)
-      autoSyncTimerRef.current = null
+      clearTimeout(autoSyncTimerRef.current);
+      autoSyncTimerRef.current = null;
     }
-    return sceneGenerationRef.current
-  }
+    return sceneGenerationRef.current;
+  };
 
-  const failSceneLoad = (error: unknown, generation = sceneGenerationRef.current): void => {
-    if (generation !== sceneGenerationRef.current) return
-    console.error('Scene load failed; backend sync is paused:', error)
-    pauseSceneSync('failed')
-  }
+  const failSceneLoad = (
+    error: unknown,
+    generation = sceneGenerationRef.current,
+  ): void => {
+    if (generation !== sceneGenerationRef.current) {
+      return;
+    }
+    console.error("Scene load failed; backend sync is paused:", error);
+    pauseSceneSync("failed");
+  };
 
   const canSyncScene = (): boolean =>
-    sceneLoadStatusRef.current === 'ready' && websocketRef.current?.readyState === WebSocket.OPEN
+    sceneLoadStatusRef.current === "ready" &&
+    websocketRef.current?.readyState === WebSocket.OPEN;
 
   const applySceneUpdateWithoutAutoSync = (
     api: ExcalidrawImperativeAPI,
-    scene: Parameters<ExcalidrawImperativeAPI['updateScene']>[0]
+    scene: Parameters<ExcalidrawImperativeAPI["updateScene"]>[0],
   ): void => {
-    suppressAutoSyncCountRef.current += 1
+    suppressAutoSyncCountRef.current += 1;
     try {
-      api.updateScene(scene)
+      api.updateScene(scene);
     } finally {
       setTimeout(() => {
-        suppressAutoSyncCountRef.current = Math.max(0, suppressAutoSyncCountRef.current - 1)
-      }, 0)
+        suppressAutoSyncCountRef.current = Math.max(
+          0,
+          suppressAutoSyncCountRef.current - 1,
+        );
+      }, 0);
     }
-  }
+  };
 
   const applyServerScene = (
     incoming: readonly Partial<ExcalidrawElement>[],
     generation: number,
     files?: Record<string, unknown>,
-    opts: { refreshDimensions?: boolean } = {}
+    opts: { refreshDimensions?: boolean } = {},
   ): void => {
-    const api = excalidrawAPIRef.current
-    if (!api || generation !== sceneGenerationRef.current) return
+    const api = excalidrawAPIRef.current;
+    if (!api || generation !== sceneGenerationRef.current) {
+      return;
+    }
     // Prepare everything before replacing the visible scene. restoreElements()
     // can silently filter elements, so both conversion and API readback need checks.
-    const prepared = prepareServerScene(incoming, opts)
-    const previous = api.getSceneElementsIncludingDeleted()
+    const prepared = prepareServerScene(incoming, opts);
+    const previous = api.getSceneElementsIncludingDeleted();
     try {
       if (files) {
-        api.addFiles(Object.values(files) as Parameters<typeof api.addFiles>[0])
-        rememberServerFiles(files)
+        api.addFiles(
+          Object.values(files) as Parameters<typeof api.addFiles>[0],
+        );
+        rememberServerFiles(files);
       }
-      applySceneUpdateWithoutAutoSync(api, { elements: prepared, captureUpdate: CaptureUpdateAction.NEVER })
-      assertScenePreserved(prepared, api.getSceneElements())
-      serverSceneHashRef.current = hashElementsVersion(api.getSceneElements())
+      applySceneUpdateWithoutAutoSync(api, {
+        elements: prepared,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+      assertScenePreserved(prepared, api.getSceneElements());
+      serverSceneHashRef.current = hashElementsVersion(api.getSceneElements());
     } catch (error) {
-      applySceneUpdateWithoutAutoSync(api, { elements: previous, captureUpdate: CaptureUpdateAction.NEVER })
-      throw error
+      applySceneUpdateWithoutAutoSync(api, {
+        elements: previous,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+      throw error;
     }
-    sceneLoadStatusRef.current = 'ready'
-    setSceneLoadStatus('ready')
+    sceneLoadStatusRef.current = "ready";
+    setSceneLoadStatus("ready");
     if (pendingElementLink) {
-      const link = pendingElementLink
-      pendingElementLink = null
+      const link = pendingElementLink;
+      pendingElementLink = null;
       // Put the link back so the address bar still shows it
-      window.history.replaceState(window.history.state, '', link)
-      api.scrollToContent(link, { animate: false })
+      window.history.replaceState(window.history.state, "", link);
+      api.scrollToContent(link, { animate: false });
     }
-  }
+  };
 
   useEffect(() => {
     return () => {
       if (autoSyncTimerRef.current) {
-        clearTimeout(autoSyncTimerRef.current)
+        clearTimeout(autoSyncTimerRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   // The first scene waits for the Latin fonts (preloadCanvasFonts). Fonts
   // that arrive later, such as CJK subsets or a preload that timed out, find
   // text already measured with a fallback font, which leaves it clipped.
   // Excalidraw itself only redraws then, so re-measure once fonts load.
   useEffect(() => {
-    const fontSet = document.fonts
-    if (!fontSet?.addEventListener) return
-    let timer: ReturnType<typeof setTimeout> | undefined
+    const fontSet = document.fonts;
+    if (!fontSet?.addEventListener) {
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const remeasureText = (): void => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       timer = setTimeout(() => {
-        const api = excalidrawAPIRef.current
-        if (!api || sceneLoadStatusRef.current !== 'ready') return
-        const current = api.getSceneElements()
-        if (!current.some(el => el.type === 'text')) return
-        try {
-          applyServerScene(current, sceneGenerationRef.current, undefined, { refreshDimensions: true })
-        } catch (error) {
-          console.warn('Could not re-measure text after fonts loaded:', error)
+        const api = excalidrawAPIRef.current;
+        if (!api || sceneLoadStatusRef.current !== "ready") {
+          return;
         }
-      }, 50)
-    }
-    fontSet.addEventListener('loadingdone', remeasureText)
+        const current = api.getSceneElements();
+        if (!current.some((el) => el.type === "text")) {
+          return;
+        }
+        try {
+          applyServerScene(current, sceneGenerationRef.current, undefined, {
+            refreshDimensions: true,
+          });
+        } catch (error) {
+          console.warn("Could not re-measure text after fonts loaded:", error);
+        }
+      }, 50);
+    };
+    fontSet.addEventListener("loadingdone", remeasureText);
     return () => {
-      fontSet.removeEventListener('loadingdone', remeasureText)
-      clearTimeout(timer)
-    }
-  }, [])
+      fontSet.removeEventListener("loadingdone", remeasureText);
+      clearTimeout(timer);
+    };
+    // Scene application reads the current API and generation through refs.
+    // Keep the font listener mounted once rather than resetting its debounce on renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // WebSocket connection
   useEffect(() => {
-    connectWebSocket()
+    connectWebSocket();
     return () => {
-      sceneGenerationRef.current += 1
-      sceneLoadStatusRef.current = 'loading'
-      const socket = websocketRef.current
-      websocketRef.current = null
-      socket?.close()
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
-    }
-  }, [])
+      sceneGenerationRef.current += 1;
+      sceneLoadStatusRef.current = "loading";
+      const socket = websocketRef.current;
+      websocketRef.current = null;
+      socket?.close();
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+    };
+    // The editor is keyed by canvasId; reconnecting on each render would drop live updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load existing elements when Excalidraw API becomes available
   useEffect(() => {
     if (excalidrawAPI) {
       // initial_elements may arrive before the API exists. HTTP is the fallback;
       // later WebSocket scenes invalidate this request through its generation.
-      if (sceneLoadStatusRef.current !== 'ready') void loadExistingElements()
+      if (sceneLoadStatusRef.current !== "ready") {
+        void loadExistingElements();
+      }
     }
-  }, [excalidrawAPI])
+    // Load when the API becomes available; subsequent scene updates use the socket and refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excalidrawAPI]);
 
   const loadExistingElements = async (): Promise<void> => {
-    if (!excalidrawAPIRef.current) return
-    const generation = pauseSceneSync()
-    try {
-      const response = await fetch(`${apiBase}/api/elements`, { signal: AbortSignal.timeout(10000) })
-      const result: ApiResponse = await response.json()
-      if (generation !== sceneGenerationRef.current) return
-      if (!response.ok || !result.success || !Array.isArray(result.elements)) {
-        throw new Error(result.error || 'Invalid scene response')
-      }
-      const filesResponse = await fetch(`${apiBase}/api/files`, { signal: AbortSignal.timeout(10000) })
-      const filesResult = await filesResponse.json() as ApiResponse
-      if (generation !== sceneGenerationRef.current) return
-      if (!filesResponse.ok || !filesResult.files) {
-        throw new Error('Could not load scene files')
-      }
-      await preloadCanvasFonts()
-      if (generation !== sceneGenerationRef.current) return
-      applyServerScene(result.elements.map(cleanElementForExcalidraw), generation, filesResult.files)
-    } catch (error) {
-      failSceneLoad(error, generation)
+    if (!excalidrawAPIRef.current) {
+      return;
     }
-  }
+    const generation = pauseSceneSync();
+    try {
+      const response = await fetch(`${apiBase}/api/elements`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      const result: ApiResponse = await response.json();
+      if (generation !== sceneGenerationRef.current) {
+        return;
+      }
+      if (!response.ok || !result.success || !Array.isArray(result.elements)) {
+        throw new Error(result.error || "Invalid scene response");
+      }
+      const filesResponse = await fetch(`${apiBase}/api/files`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      const filesResult = (await filesResponse.json()) as ApiResponse;
+      if (generation !== sceneGenerationRef.current) {
+        return;
+      }
+      if (!filesResponse.ok || !filesResult.files) {
+        throw new Error("Could not load scene files");
+      }
+      await preloadCanvasFonts();
+      if (generation !== sceneGenerationRef.current) {
+        return;
+      }
+      applyServerScene(
+        result.elements.map(cleanElementForExcalidraw),
+        generation,
+        filesResult.files,
+      );
+    } catch (error) {
+      failSceneLoad(error, generation);
+    }
+  };
 
   const connectWebSocket = (): void => {
     // Guard CONNECTING too: the mount effect and the excalidrawAPI effect can
     // both run before the first socket opens, orphaning a live duplicate
     // connection whose handlers then process every broadcast twice.
-    if (websocketRef.current &&
-        (websocketRef.current.readyState === WebSocket.CONNECTING ||
-         websocketRef.current.readyState === WebSocket.OPEN)) {
-      return
+    if (
+      websocketRef.current &&
+      (websocketRef.current.readyState === WebSocket.CONNECTING ||
+        websocketRef.current.readyState === WebSocket.OPEN)
+    ) {
+      return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}${apiBase}/ws`
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}${apiBase}/ws`;
 
-    const socket = new WebSocket(wsUrl)
-    websocketRef.current = socket
+    const socket = new WebSocket(wsUrl);
+    websocketRef.current = socket;
 
     socket.onopen = () => {
-      if (websocketRef.current !== socket) return
-      setIsConnected(true)
-      void loadExistingElements()
-    }
+      if (websocketRef.current !== socket) {
+        return;
+      }
+      setIsConnected(true);
+      void loadExistingElements();
+    };
 
     socket.onmessage = (event: MessageEvent) => {
-      if (websocketRef.current !== socket) return
-      try {
-        const data: WebSocketMessage = JSON.parse(event.data)
-        void handleWebSocketMessage(data)
-      } catch (error) {
-        failSceneLoad(error)
+      if (websocketRef.current !== socket) {
+        return;
       }
-    }
+      try {
+        const data: WebSocketMessage = JSON.parse(event.data);
+        void handleWebSocketMessage(data);
+      } catch (error) {
+        failSceneLoad(error);
+      }
+    };
 
     socket.onclose = (event: CloseEvent) => {
-      if (websocketRef.current !== socket) return
-      setIsConnected(false)
-      pauseSceneSync()
+      if (websocketRef.current !== socket) {
+        return;
+      }
+      setIsConnected(false);
+      pauseSceneSync();
 
       // Reconnect after 3 seconds if not a clean close
       if (event.code !== 1000) {
-        reconnectTimerRef.current = setTimeout(connectWebSocket, 3000)
+        reconnectTimerRef.current = setTimeout(connectWebSocket, 3000);
       }
-    }
+    };
 
     socket.onerror = (error: Event) => {
-      if (websocketRef.current !== socket) return
-      console.error('WebSocket error:', error)
-      setIsConnected(false)
-      pauseSceneSync()
-    }
-  }
+      if (websocketRef.current !== socket) {
+        return;
+      }
+      console.error("WebSocket error:", error);
+      setIsConnected(false);
+      pauseSceneSync();
+    };
+  };
 
-  const handleWebSocketMessage = async (data: WebSocketMessage): Promise<void> => {
-    const excalidrawAPI = excalidrawAPIRef.current
+  const handleWebSocketMessage = async (
+    data: WebSocketMessage,
+  ): Promise<void> => {
+    const excalidrawAPI = excalidrawAPIRef.current;
     if (!excalidrawAPI) {
-      return
+      return;
     }
 
-    if (SCENE_MUTATIONS.has(data.type) && sceneLoadStatusRef.current !== 'ready') {
+    if (
+      SCENE_MUTATIONS.has(data.type) &&
+      sceneLoadStatusRef.current !== "ready"
+    ) {
       // An incremental event cannot prove that a failed or pending full load
       // was complete. Fetch the current full scene instead of reopening sync.
-      void loadExistingElements()
-      return
+      void loadExistingElements();
+      return;
     }
 
     try {
-      const currentElements = excalidrawAPI.getSceneElements()
-      const mergeAndApplySceneElements = (incomingElements: Partial<ExcalidrawElement>[]): void => {
-        if (incomingElements.length === 0) return
+      const currentElements = excalidrawAPI.getSceneElements();
+      const mergeAndApplySceneElements = (
+        incomingElements: Partial<ExcalidrawElement>[],
+      ): void => {
+        if (incomingElements.length === 0) {
+          return;
+        }
 
-        const incomingById = new Map<string, Partial<ExcalidrawElement>>()
+        const incomingById = new Map<string, Partial<ExcalidrawElement>>();
         incomingElements.forEach((element) => {
           if (element.id) {
-            incomingById.set(element.id, element)
+            incomingById.set(element.id, element);
           }
-        })
+        });
 
-        const mergedElements: Partial<ExcalidrawElement>[] = currentElements.map((element) => {
-          const incoming = incomingById.get(element.id)
-          if (!incoming) return element
-          incomingById.delete(element.id)
-          return { ...element, ...incoming }
-        })
+        const mergedElements: Partial<ExcalidrawElement>[] =
+          currentElements.map((element) => {
+            const incoming = incomingById.get(element.id);
+            if (!incoming) {
+              return element;
+            }
+            incomingById.delete(element.id);
+            return { ...element, ...incoming };
+          });
 
-        mergedElements.push(...incomingById.values())
+        mergedElements.push(...incomingById.values());
 
         // `refreshDimensions` re-wraps bound text from its `originalText`. An
         // update can resize a container (`update_element` with a new width),
         // and without this the label keeps the line breaks computed for the old
         // box — the shape grows, the text stays broken where it was.
-        applyServerScene(mergedElements, pauseSceneSync(), undefined, { refreshDimensions: true })
-      }
+        applyServerScene(mergedElements, pauseSceneSync(), undefined, {
+          refreshDimensions: true,
+        });
+      };
 
       switch (data.type) {
-        case 'initial_elements':
+        case "initial_elements":
           {
-            const generation = pauseSceneSync()
-            if (!Array.isArray(data.elements)) throw new Error('Invalid initial scene')
+            const generation = pauseSceneSync();
+            if (!Array.isArray(data.elements)) {
+              throw new Error("Invalid initial scene");
+            }
             // Measure the first scene with the real fonts, not a fallback
-            await preloadCanvasFonts()
-            if (generation !== sceneGenerationRef.current) return
-            applyServerScene(data.elements.map(cleanElementForExcalidraw), generation, (data as any).files)
+            await preloadCanvasFonts();
+            if (generation !== sceneGenerationRef.current) {
+              return;
+            }
+            applyServerScene(
+              data.elements.map(cleanElementForExcalidraw),
+              generation,
+              (data as any).files,
+            );
           }
-          break
+          break;
 
-        case 'files_added':
+        case "files_added":
           if (Array.isArray((data as any).files)) {
-            excalidrawAPI.addFiles((data as any).files)
-            rememberServerFiles((data as any).files)
+            excalidrawAPI.addFiles((data as any).files);
+            rememberServerFiles((data as any).files);
           }
-          break
+          break;
 
-        case 'file_deleted':
+        case "file_deleted":
           // Upload it again if an image on the canvas still uses it
-          if (typeof (data as any).fileId === 'string') {
-            serverFileIdsRef.current.delete((data as any).fileId)
+          if (typeof (data as any).fileId === "string") {
+            serverFileIdsRef.current.delete((data as any).fileId);
           }
-          break
+          break;
 
-        case 'element_created':
-          if (!data.element) throw new Error('Missing created element')
+        case "element_created":
+          if (!data.element) {
+            throw new Error("Missing created element");
+          }
           if (data.element) {
-            const cleanedNewElement = cleanElementForExcalidraw(data.element)
+            const cleanedNewElement = cleanElementForExcalidraw(data.element);
             // Rebuild against full scene so text/container bindings remain intact.
-            mergeAndApplySceneElements([cleanedNewElement])
+            mergeAndApplySceneElements([cleanedNewElement]);
           }
-          break
+          break;
 
-        case 'element_updated':
-          if (!data.element) throw new Error('Missing updated element')
+        case "element_updated":
+          if (!data.element) {
+            throw new Error("Missing updated element");
+          }
           if (data.element) {
-            const cleanedUpdatedElement = cleanElementForExcalidraw(data.element)
+            const cleanedUpdatedElement = cleanElementForExcalidraw(
+              data.element,
+            );
             // Convert with full scene context so text metrics/container placement can refresh.
-            mergeAndApplySceneElements([cleanedUpdatedElement])
+            mergeAndApplySceneElements([cleanedUpdatedElement]);
           }
-          break
+          break;
 
-        case 'element_deleted':
-          if (!data.elementId) throw new Error('Missing deleted element ID')
+        case "element_deleted":
+          if (!data.elementId) {
+            throw new Error("Missing deleted element ID");
+          }
           if (data.elementId) {
-            const filteredElements = currentElements.filter(el => el.id !== data.elementId)
-            applyServerScene(filteredElements, pauseSceneSync())
+            const filteredElements = currentElements.filter(
+              (el) => el.id !== data.elementId,
+            );
+            applyServerScene(filteredElements, pauseSceneSync());
           }
-          break
+          break;
 
-        case 'elements_batch_created':
-          if (!Array.isArray(data.elements)) throw new Error('Invalid element batch')
+        case "elements_batch_created":
+          if (!Array.isArray(data.elements)) {
+            throw new Error("Invalid element batch");
+          }
           if (data.elements) {
-            const cleanedBatchElements = data.elements.map(cleanElementForExcalidraw)
-            mergeAndApplySceneElements(cleanedBatchElements)
+            const cleanedBatchElements = data.elements.map(
+              cleanElementForExcalidraw,
+            );
+            mergeAndApplySceneElements(cleanedBatchElements);
           }
-          break
+          break;
 
-        case 'elements_synced':
-          console.log(`Sync confirmed by server: ${data.count} elements`)
+        case "elements_synced":
           // Sync confirmation already handled by HTTP response
-          break
+          break;
 
-        case 'sync_status':
-          console.log(`Server sync status: ${data.count} elements`)
-          break
+        case "sync_status":
+          break;
 
-        case 'canvas_cleared':
-          console.log('Canvas cleared by server')
-          applyServerScene([], pauseSceneSync())
-          break
+        case "canvas_cleared":
+          applyServerScene([], pauseSceneSync());
+          break;
 
-        case 'export_image_request':
+        case "export_image_request":
           if (data.requestId) {
             try {
-              if (!canSyncScene()) throw new Error('Scene is not fully loaded; export is paused')
+              if (!canSyncScene()) {
+                throw new Error("Scene is not fully loaded; export is paused");
+              }
               // Same option surface as the headless renderer (renderer:'node'),
               // so `--renderer browser` accepts identical flags.
-              const opts = data.options ?? {}
-              const embedScene = opts.embedScene === true
-              if (embedScene && data.format !== 'png') throw new Error('embedScene is only supported for PNG exports')
-              const allElements = excalidrawAPI.getSceneElements()
-              const wanted = opts.elementIds ? new Set(opts.elementIds) : null
-              const elements = wanted
-                ? allElements.filter(el => wanted.has(el.id) || (el.type === 'text' && (el as any).containerId && wanted.has((el as any).containerId)))
-                : allElements
-              const exportingFrame = opts.frameId
-                ? (allElements.find(el => el.id === opts.frameId && (el.type === 'frame' || el.type === 'magicframe')) as any) ?? null
-                : null
-              if (opts.frameId && !exportingFrame) throw new Error(`Unknown frame id: ${opts.frameId}`)
-              let exportElements = embedScene && exportingFrame
-                ? elementsOverlappingBBox({ elements, bounds: exportingFrame, type: 'overlap' })
-                  .filter((el: ExcalidrawElement) => !el.frameId || el.frameId === exportingFrame.id)
-                : elements
-              if (embedScene) {
-                const exportedIds = new Set(exportElements.map((el: ExcalidrawElement) => el.id))
-                exportElements = exportElements.map((el: ExcalidrawElement) =>
-                  el.frameId && !exportedIds.has(el.frameId) ? { ...el, frameId: null } : el)
+              const opts = data.options ?? {};
+              const embedScene = opts.embedScene === true;
+              if (embedScene && data.format !== "png") {
+                throw new Error("embedScene is only supported for PNG exports");
               }
-              const appState = excalidrawAPI.getAppState()
+              const allElements = excalidrawAPI.getSceneElements();
+              const wanted = opts.elementIds ? new Set(opts.elementIds) : null;
+              const elements = wanted
+                ? allElements.filter(
+                    (el) =>
+                      wanted.has(el.id) ||
+                      (el.type === "text" &&
+                        (el as any).containerId &&
+                        wanted.has((el as any).containerId)),
+                  )
+                : allElements;
+              const exportingFrame = opts.frameId
+                ? (allElements.find(
+                    (el) =>
+                      el.id === opts.frameId &&
+                      (el.type === "frame" || el.type === "magicframe"),
+                  ) as any) ?? null
+                : null;
+              if (opts.frameId && !exportingFrame) {
+                throw new Error(`Unknown frame id: ${opts.frameId}`);
+              }
+              let exportElements =
+                embedScene && exportingFrame
+                  ? elementsOverlappingBBox({
+                      elements,
+                      bounds: exportingFrame,
+                      type: "overlap",
+                    }).filter(
+                      (el: ExcalidrawElement) =>
+                        !el.frameId || el.frameId === exportingFrame.id,
+                    )
+                  : elements;
+              if (embedScene) {
+                const exportedIds = new Set(
+                  exportElements.map((el: ExcalidrawElement) => el.id),
+                );
+                exportElements = exportElements.map((el: ExcalidrawElement) =>
+                  el.frameId && !exportedIds.has(el.frameId)
+                    ? { ...el, frameId: null }
+                    : el,
+                );
+              }
+              const appState = excalidrawAPI.getAppState();
               const exportAppState = {
                 ...appState,
                 exportBackground: data.background !== false,
                 exportEmbedScene: embedScene,
-                ...(opts.dark !== undefined ? { exportWithDarkMode: opts.dark } : {}),
-                exportScale: opts.scale ?? 1
-              }
-              const files = excalidrawAPI.getFiles()
+                ...(opts.dark !== undefined
+                  ? { exportWithDarkMode: opts.dark }
+                  : {}),
+                exportScale: opts.scale ?? 1,
+              };
+              const files = excalidrawAPI.getFiles();
 
-              if (data.format === 'svg') {
+              if (data.format === "svg") {
                 const svg = await exportToSvg({
                   elements,
                   appState: exportAppState,
                   files,
                   exportPadding: opts.padding,
-                  exportingFrame
-                })
-                const svgString = new XMLSerializer().serializeToString(svg)
+                  exportingFrame,
+                });
+                const svgString = new XMLSerializer().serializeToString(svg);
                 await fetch(`${apiBase}/api/export/image/result`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     requestId: data.requestId,
-                    format: 'svg',
-                    data: svgString
-                  })
-                })
+                    format: "svg",
+                    data: svgString,
+                  }),
+                });
               } else {
                 const blob = await exportToBlob({
                   elements: exportElements,
                   appState: exportAppState,
                   files,
-                  mimeType: 'image/png',
+                  mimeType: "image/png",
                   exportPadding: opts.padding,
-                  exportingFrame
-                })
-                const reader = new FileReader()
+                  exportingFrame,
+                });
+                const reader = new FileReader();
                 reader.onload = async () => {
                   try {
-                    const resultString = reader.result as string
-                    const base64 = resultString?.split(',')[1]
+                    const resultString = reader.result as string;
+                    const base64 = resultString?.split(",")[1];
                     if (!base64) {
-                      throw new Error('Could not extract base64 data from result')
+                      throw new Error(
+                        "Could not extract base64 data from result",
+                      );
                     }
                     await fetch(`${apiBase}/api/export/image/result`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         requestId: data.requestId,
-                        format: 'png',
-                        data: base64
-                      })
-                    })
+                        format: "png",
+                        data: base64,
+                      }),
+                    });
                   } catch (readerError) {
-                    console.error('Image export (FileReader) failed:', readerError)
+                    console.error(
+                      "Image export (FileReader) failed:",
+                      readerError,
+                    );
                     await fetch(`${apiBase}/api/export/image/result`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         requestId: data.requestId,
-                        error: (readerError as Error).message
-                      })
-                    }).catch(() => { })
+                        error: (readerError as Error).message,
+                      }),
+                    }).catch(() => {});
                   }
-                }
+                };
                 reader.onerror = async () => {
-                  console.error('FileReader error:', reader.error)
+                  console.error("FileReader error:", reader.error);
                   await fetch(`${apiBase}/api/export/image/result`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       requestId: data.requestId,
-                      error: reader.error?.message || 'FileReader failed'
-                    })
-                  }).catch(() => { })
-                }
-                reader.readAsDataURL(blob)
+                      error: reader.error?.message || "FileReader failed",
+                    }),
+                  }).catch(() => {});
+                };
+                reader.readAsDataURL(blob);
               }
             } catch (exportError) {
-              console.error('Image export failed:', exportError)
+              console.error("Image export failed:", exportError);
               await fetch(`${apiBase}/api/export/image/result`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   requestId: data.requestId,
-                  error: (exportError as Error).message
-                })
-              })
+                  error: (exportError as Error).message,
+                }),
+              });
             }
           }
-          break
+          break;
 
-        case 'set_viewport':
-          console.log('Received viewport control request', data)
+        case "set_viewport":
           if (data.requestId) {
             try {
               if (data.scrollToContent) {
-                const allElements = excalidrawAPI.getSceneElements()
+                const allElements = excalidrawAPI.getSceneElements();
                 if (allElements.length > 0) {
                   excalidrawAPI.scrollToContent(allElements, {
                     fitToViewport: true,
                     viewportZoomFactor: data.viewportZoomFactor,
-                    animate: true
-                  })
+                    animate: true,
+                  });
                 }
               } else if (data.scrollToElementIds !== undefined) {
-                if (!Array.isArray(data.scrollToElementIds) ||
-                    data.scrollToElementIds.length === 0 ||
-                    !data.scrollToElementIds.every(id => typeof id === 'string' && id.length > 0)) {
-                  throw new Error('scrollToElementIds must be a non-empty array of element IDs')
+                if (
+                  !Array.isArray(data.scrollToElementIds) ||
+                  data.scrollToElementIds.length === 0 ||
+                  !data.scrollToElementIds.every(
+                    (id) => typeof id === "string" && id.length > 0,
+                  )
+                ) {
+                  throw new Error(
+                    "scrollToElementIds must be a non-empty array of element IDs",
+                  );
                 }
-                const allElements = excalidrawAPI.getSceneElements()
-                const requestedIds = new Set(data.scrollToElementIds)
-                const targetElements = allElements.filter(el => requestedIds.has(el.id))
-                const foundIds = new Set(targetElements.map(el => el.id))
-                const missingIds = data.scrollToElementIds.filter(id => !foundIds.has(id))
+                const allElements = excalidrawAPI.getSceneElements();
+                const requestedIds = new Set(data.scrollToElementIds);
+                const targetElements = allElements.filter((el) =>
+                  requestedIds.has(el.id),
+                );
+                const foundIds = new Set(targetElements.map((el) => el.id));
+                const missingIds = data.scrollToElementIds.filter(
+                  (id) => !foundIds.has(id),
+                );
                 if (missingIds.length > 0) {
-                  throw new Error(`Elements not found for IDs: ${missingIds.join(', ')}`)
+                  throw new Error(
+                    `Elements not found for IDs: ${missingIds.join(", ")}`,
+                  );
                 }
                 excalidrawAPI.scrollToContent(targetElements, {
                   fitToViewport: true,
                   viewportZoomFactor: data.viewportZoomFactor,
-                  animate: true
-                })
+                  animate: true,
+                });
               } else if (data.scrollToElementId) {
-                const allElements = excalidrawAPI.getSceneElements()
-                const targetElement = allElements.find(el => el.id === data.scrollToElementId)
+                const allElements = excalidrawAPI.getSceneElements();
+                const targetElement = allElements.find(
+                  (el) => el.id === data.scrollToElementId,
+                );
                 if (targetElement) {
-                  excalidrawAPI.scrollToContent([targetElement], { fitToViewport: false, animate: true })
+                  excalidrawAPI.scrollToContent([targetElement], {
+                    fitToViewport: false,
+                    animate: true,
+                  });
                 } else {
-                  throw new Error(`Element ${data.scrollToElementId} not found`)
+                  throw new Error(
+                    `Element ${data.scrollToElementId} not found`,
+                  );
                 }
               } else {
                 // Direct zoom/scroll control
-                const appState: any = {}
+                const appState: any = {};
                 if (data.zoom !== undefined) {
-                  appState.zoom = { value: data.zoom }
+                  appState.zoom = { value: data.zoom };
                 }
                 if (data.offsetX !== undefined) {
-                  appState.scrollX = data.offsetX
+                  appState.scrollX = data.offsetX;
                 }
                 if (data.offsetY !== undefined) {
-                  appState.scrollY = data.offsetY
+                  appState.scrollY = data.offsetY;
                 }
                 if (Object.keys(appState).length > 0) {
-                  applySceneUpdateWithoutAutoSync(excalidrawAPI, { appState })
+                  applySceneUpdateWithoutAutoSync(excalidrawAPI, { appState });
                 }
               }
 
               await fetch(`${apiBase}/api/viewport/result`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   requestId: data.requestId,
                   success: true,
-                  message: 'Viewport updated'
-                })
-              })
+                  message: "Viewport updated",
+                }),
+              });
             } catch (viewportError) {
-              console.error('Viewport control failed:', viewportError)
+              console.error("Viewport control failed:", viewportError);
               await fetch(`${apiBase}/api/viewport/result`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   requestId: data.requestId,
-                  error: (viewportError as Error).message
-                })
-              }).catch(() => { })
+                  error: (viewportError as Error).message,
+                }),
+              }).catch(() => {});
             }
           }
-          break
+          break;
 
-        case 'mermaid_convert':
-          console.log('Received Mermaid conversion request from MCP')
+        case "mermaid_convert":
           if (data.mermaidDiagram) {
             try {
-              if (!canSyncScene()) throw new Error('Scene is not fully loaded; Mermaid import is paused')
-              const generation = sceneGenerationRef.current
-              const result = await convertMermaidToExcalidraw(data.mermaidDiagram, data.config || DEFAULT_MERMAID_CONFIG)
-              if (!canSyncScene() || generation !== sceneGenerationRef.current) return
+              if (!canSyncScene()) {
+                throw new Error(
+                  "Scene is not fully loaded; Mermaid import is paused",
+                );
+              }
+              const generation = sceneGenerationRef.current;
+              const result = await convertMermaidToExcalidraw(
+                data.mermaidDiagram,
+                data.config || DEFAULT_MERMAID_CONFIG,
+              );
+              if (
+                !canSyncScene() ||
+                generation !== sceneGenerationRef.current
+              ) {
+                return;
+              }
 
               if (result.error) {
-                console.error('Mermaid conversion error:', result.error)
-                return
+                console.error("Mermaid conversion error:", result.error);
+                return;
               }
 
               if (result.elements && result.elements.length > 0) {
                 // Regenerate ids so repeated conversions of the same diagram
                 // (mermaid emits stable ids like "A", "B") can't collide with
                 // elements already on the canvas.
-                const convertedElements = convertToExcalidrawElements([...result.elements] as Parameters<typeof convertToExcalidrawElements>[0], { regenerateIds: true })
+                const convertedElements = convertToExcalidrawElements(
+                  [...result.elements] as Parameters<
+                    typeof convertToExcalidrawElements
+                  >[0],
+                  { regenerateIds: true },
+                );
                 // Merge with the existing scene — updateScene() replaces the
                 // element list wholesale, and syncToBackend() would otherwise
                 // propagate that wipe to the server.
                 applySceneUpdateWithoutAutoSync(excalidrawAPI, {
-                  elements: [...excalidrawAPI.getSceneElements(), ...convertedElements],
-                  captureUpdate: CaptureUpdateAction.IMMEDIATELY
-                })
+                  elements: [
+                    ...excalidrawAPI.getSceneElements(),
+                    ...convertedElements,
+                  ],
+                  captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+                });
 
                 if (result.files) {
-                  excalidrawAPI.addFiles(Object.values(result.files))
+                  excalidrawAPI.addFiles(Object.values(result.files));
                 }
 
-                console.log('Mermaid diagram converted successfully:', result.elements.length, 'elements')
-
                 // Sync to backend automatically after creating elements
-                await syncToBackend()
+                await syncToBackend();
               }
             } catch (error) {
-              console.error('Error converting Mermaid diagram from WebSocket:', error)
+              console.error(
+                "Error converting Mermaid diagram from WebSocket:",
+                error,
+              );
             }
           }
-          break
+          break;
 
         default:
-          console.log('Unknown WebSocket message type:', data.type)
       }
     } catch (error) {
-      console.error('Error processing WebSocket message:', error, data)
-      if (data.type === 'initial_elements' || data.type === 'canvas_cleared' || SCENE_MUTATIONS.has(data.type)) {
-        failSceneLoad(error)
+      console.error("Error processing WebSocket message:", error, data);
+      if (
+        data.type === "initial_elements" ||
+        data.type === "canvas_cleared" ||
+        SCENE_MUTATIONS.has(data.type)
+      ) {
+        failSceneLoad(error);
       }
     }
-  }
+  };
 
   // Data format conversion for backend
-  const convertToBackendFormat = (element: ExcalidrawElement): ServerElement => {
+  const convertToBackendFormat = (
+    element: ExcalidrawElement,
+  ): ServerElement => {
     return {
-      ...element
-    } as ServerElement
-  }
+      ...element,
+    } as ServerElement;
+  };
 
   // Main sync function
-  const syncToBackend = async (options: { silent?: boolean } = {}): Promise<void> => {
-    const { silent = false } = options
+  const syncToBackend = async (): Promise<void> => {
     // Every caller, including manual sync and Mermaid, must respect a failed
     // restore. A user interaction alone is not evidence of a complete scene.
-    if (!canSyncScene()) return
+    if (!canSyncScene()) {
+      return;
+    }
 
     // Read through the ref: WS message handlers attached at mount capture a
     // stale closure where the excalidrawAPI state is still null.
-    const api = excalidrawAPIRef.current
+    const api = excalidrawAPIRef.current;
     if (!api) {
-      console.warn('Excalidraw API not available')
-      return
+      console.warn("Excalidraw API not available");
+      return;
     }
 
     if (syncInFlightRef.current) {
-      return
+      return;
     }
 
     if (autoSyncTimerRef.current) {
-      clearTimeout(autoSyncTimerRef.current)
-      autoSyncTimerRef.current = null
+      clearTimeout(autoSyncTimerRef.current);
+      autoSyncTimerRef.current = null;
     }
 
-    syncInFlightRef.current = true
-    setSyncStatus('syncing')
+    syncInFlightRef.current = true;
+    setSyncStatus("syncing");
 
     try {
       // 1. Get current elements
-      const currentElements = api.getSceneElements()
-      const syncedHash = hashElementsVersion(currentElements)
-      console.log(`Syncing ${currentElements.length} elements to backend`)
+      const currentElements = api.getSceneElements();
+      const syncedHash = hashElementsVersion(currentElements);
 
       // Filter out deleted elements
-      const activeElements = currentElements.filter(el => !el.isDeleted)
+      const activeElements = currentElements.filter((el) => !el.isDeleted);
 
       // 2. Upload image files the server lacks, before the elements that use
       // them. An image element only holds a fileId; without the file the
       // server keeps a dangling reference and a reload shows a broken image.
       // One request per file keeps each body under the server's JSON limit.
-      const usedFileIds = new Set(activeElements.flatMap(el =>
-        el.type === 'image' && el.fileId ? [el.fileId as string] : []))
-      const newFiles = Object.values(api.getFiles()).filter(file =>
-        usedFileIds.has(file.id) && file.dataURL && !serverFileIdsRef.current.has(file.id))
+      const usedFileIds = new Set(
+        activeElements.flatMap((el) =>
+          el.type === "image" && el.fileId ? [el.fileId as string] : [],
+        ),
+      );
+      const newFiles = Object.values(api.getFiles()).filter(
+        (file) =>
+          usedFileIds.has(file.id) &&
+          file.dataURL &&
+          !serverFileIdsRef.current.has(file.id),
+      );
       for (const file of newFiles) {
         const fileResponse = await fetch(`${apiBase}/api/files`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ files: [{
-            id: file.id, dataURL: file.dataURL, mimeType: file.mimeType, created: file.created
-          }] })
-        })
-        if (!fileResponse.ok) throw new Error(`Image upload failed: HTTP ${fileResponse.status}`)
-        serverFileIdsRef.current.add(file.id)
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            files: [
+              {
+                id: file.id,
+                dataURL: file.dataURL,
+                mimeType: file.mimeType,
+                created: file.created,
+              },
+            ],
+          }),
+        });
+        if (!fileResponse.ok) {
+          throw new Error(`Image upload failed: HTTP ${fileResponse.status}`);
+        }
+        serverFileIdsRef.current.add(file.id);
       }
 
       // 3. Convert to backend format
-      const backendElements = activeElements.map(convertToBackendFormat)
+      const backendElements = activeElements.map(convertToBackendFormat);
 
       // 4. Send to backend
       const response = await fetch(`${apiBase}/api/elements/sync`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           elements: backendElements,
-          timestamp: new Date().toISOString()
-        })
-      })
+          timestamp: new Date().toISOString(),
+        }),
+      });
 
       if (response.ok) {
-        const result: ApiResponse = await response.json()
-        serverSceneHashRef.current = syncedHash
-        setLastSyncTime(new Date())
-        console.log(`Sync successful: ${result.count} elements synced`)
+        await response.json();
+        serverSceneHashRef.current = syncedHash;
+        setLastSyncTime(new Date());
 
-        setSyncStatus('success')
+        setSyncStatus("success");
       } else {
-        const error: ApiResponse = await response.json()
-        console.error('Sync failed:', error.error)
-        setSyncStatus('error')
+        const error: ApiResponse = await response.json();
+        console.error("Sync failed:", error.error);
+        setSyncStatus("error");
       }
     } catch (error) {
-      console.error('Sync error:', error)
-      setSyncStatus('error')
+      console.error("Sync error:", error);
+      setSyncStatus("error");
     } finally {
-      syncInFlightRef.current = false
+      syncInFlightRef.current = false;
     }
-  }
+  };
 
   const scheduleAutoSync = (): void => {
     if (!canSyncScene() || !excalidrawAPI) {
-      return
+      return;
     }
     if (!userInteractedRef.current) {
-      return
+      return;
     }
     if (suppressAutoSyncCountRef.current > 0) {
-      return
+      return;
     }
-    if (hashElementsVersion(excalidrawAPI.getSceneElements()) === serverSceneHashRef.current) {
-      return
+    if (
+      hashElementsVersion(excalidrawAPI.getSceneElements()) ===
+      serverSceneHashRef.current
+    ) {
+      return;
     }
     if (autoSyncTimerRef.current) {
-      clearTimeout(autoSyncTimerRef.current)
+      clearTimeout(autoSyncTimerRef.current);
     }
 
-    setSyncStatus('syncing')
+    setSyncStatus("syncing");
     autoSyncTimerRef.current = setTimeout(() => {
-      autoSyncTimerRef.current = null
+      autoSyncTimerRef.current = null;
       if (suppressAutoSyncCountRef.current > 0 || syncInFlightRef.current) {
-        return
+        return;
       }
-      void syncToBackend({ silent: true })
-    }, AUTO_SYNC_DEBOUNCE_MS)
-  }
+      void syncToBackend();
+    }, AUTO_SYNC_DEBOUNCE_MS);
+  };
 
   React.useImperativeHandle(ref, () => ({
     flush: async () => {
-      while (syncInFlightRef.current) await new Promise(resolve => setTimeout(resolve, 30))
-      const api = excalidrawAPIRef.current
-      if (!api || !userInteractedRef.current || hashElementsVersion(api.getSceneElements()) === serverSceneHashRef.current) return
-      await syncToBackend()
-      if (hashElementsVersion(api.getSceneElements()) !== serverSceneHashRef.current) {
-        throw new Error('Your latest changes have not saved. Keep this canvas open and retry when connected.')
+      while (syncInFlightRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 30));
       }
-    }
-  }))
+      const api = excalidrawAPIRef.current;
+      if (
+        !api ||
+        !userInteractedRef.current ||
+        hashElementsVersion(api.getSceneElements()) ===
+          serverSceneHashRef.current
+      ) {
+        return;
+      }
+      await syncToBackend();
+      if (
+        hashElementsVersion(api.getSceneElements()) !==
+        serverSceneHashRef.current
+      ) {
+        throw new Error(
+          "Your latest changes have not saved. Keep this canvas open and retry when connected.",
+        );
+      }
+    },
+  }));
 
   useEffect(() => {
-    const view = appRef.current?.ownerDocument.defaultView
-    if (!view) return
-    const beforeUnload = (event: BeforeUnloadEvent) => {
-      const api = excalidrawAPIRef.current
-      if (api && userInteractedRef.current && hashElementsVersion(api.getSceneElements()) !== serverSceneHashRef.current) {
-        event.preventDefault()
-        event.returnValue = ''
-      }
+    const view = appRef.current?.ownerDocument.defaultView;
+    if (!view) {
+      return;
     }
-    view.addEventListener('beforeunload', beforeUnload)
-    return () => view.removeEventListener('beforeunload', beforeUnload)
-  }, [])
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      const api = excalidrawAPIRef.current;
+      if (
+        api &&
+        userInteractedRef.current &&
+        hashElementsVersion(api.getSceneElements()) !==
+          serverSceneHashRef.current
+      ) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    view.addEventListener("beforeunload", beforeUnload);
+    return () => view.removeEventListener("beforeunload", beforeUnload);
+  }, []);
 
-  const saveMessage = !isConnected ? 'Reconnecting…' : syncStatus === 'syncing' ? 'Saving…' : syncStatus === 'error' ? 'Could not save' : sceneLoadStatus === 'ready' ? 'All changes saved' : 'Loading…'
+  const saveMessage = !isConnected
+    ? "Reconnecting…"
+    : syncStatus === "syncing"
+    ? "Saving…"
+    : syncStatus === "error"
+    ? "Could not save"
+    : sceneLoadStatus === "ready"
+    ? "All changes saved"
+    : "Loading…";
 
   return (
     <div className="canvas-editor" data-theme={theme} ref={appRef}>
-      {statusContainer && createPortal(<div className="editor-save-status" role="status" aria-live="polite" title={saveMessage}>
-        <span className={`connection-dot ${isConnected && syncStatus !== 'error' ? 'online' : ''}`} aria-hidden="true" />
-        <span className="save-label">{saveMessage}</span>
-        {syncStatus === 'error' && <button onClick={() => void syncToBackend()}>Retry saving</button>}
-      </div>, statusContainer)}
+      {statusContainer &&
+        createPortal(
+          <div
+            className="editor-save-status"
+            role="status"
+            aria-live="polite"
+            title={saveMessage}
+          >
+            <span
+              className={`connection-dot ${
+                isConnected && syncStatus !== "error" ? "online" : ""
+              }`}
+              aria-hidden="true"
+            />
+            <span className="save-label">{saveMessage}</span>
+            {syncStatus === "error" && (
+              <button onClick={() => void syncToBackend()}>Retry saving</button>
+            )}
+          </div>,
+          statusContainer,
+        )}
 
-      {sceneLoadStatus !== 'ready' && (
-        <div className="scene-load-status" role={sceneLoadStatus === 'failed' ? 'alert' : 'status'}>
-          <span>{sceneLoadStatus === 'failed'
-            ? 'Canvas could not be loaded. Sync is paused to protect your saved scene.'
-            : 'Loading canvas. Sync is paused until the scene is ready.'}</span>
-          {sceneLoadStatus === 'failed' && (
-            <button className="btn-secondary" onClick={() => void loadExistingElements()}>Retry loading</button>
+      {sceneLoadStatus !== "ready" && (
+        <div
+          className="scene-load-status"
+          role={sceneLoadStatus === "failed" ? "alert" : "status"}
+        >
+          <span>
+            {sceneLoadStatus === "failed"
+              ? "Canvas could not be loaded. Sync is paused to protect your saved scene."
+              : "Loading canvas. Sync is paused until the scene is ready."}
+          </span>
+          {sceneLoadStatus === "failed" && (
+            <button
+              className="btn-secondary"
+              onClick={() => void loadExistingElements()}
+            >
+              Retry loading
+            </button>
           )}
         </div>
       )}
@@ -919,32 +1201,34 @@ const App = React.forwardRef<EditorHandle, { canvasId: string; theme: 'light' | 
       <div className="canvas-container">
         <div
           onPointerDownCapture={() => {
-            userInteractedRef.current = true
+            userInteractedRef.current = true;
           }}
           onKeyDownCapture={() => {
-            userInteractedRef.current = true
+            userInteractedRef.current = true;
           }}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: "100%", height: "100%" }}
         >
           <Excalidraw
             // Controlled: Excalidraw resets to light when an action result
             // omits the theme and no theme prop is set (e.g. copy element link).
             theme={theme}
             UIOptions={UI_OPTIONS}
-            viewModeEnabled={sceneLoadStatus !== 'ready' || !isConnected}
-            excalidrawAPI={(api: ExcalidrawAPIRefValue) => setExcalidrawAPI(api)}
+            viewModeEnabled={sceneLoadStatus !== "ready" || !isConnected}
+            excalidrawAPI={(api: ExcalidrawAPIRefValue) =>
+              setExcalidrawAPI(api)
+            }
             onChange={() => scheduleAutoSync()}
             initialData={{
               elements: [],
               appState: {
-                theme
-              }
+                theme,
+              },
             }}
           />
         </div>
       </div>
     </div>
-  )
-})
+  );
+});
 
-export default App
+export default App;

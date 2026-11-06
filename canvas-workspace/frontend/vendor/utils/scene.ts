@@ -1,5 +1,9 @@
-import { convertToExcalidrawElements, restoreElements } from '@excalidraw/excalidraw'
-import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types'
+import {
+  convertToExcalidrawElements,
+  restoreElements,
+} from "@excalidraw/excalidraw";
+
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 
 export interface ServerElement {
   id: string;
@@ -45,7 +49,9 @@ export interface ServerElement {
 }
 
 // Helper function to clean elements for Excalidraw
-export const cleanElementForExcalidraw = (element: ServerElement): Partial<ExcalidrawElement> => {
+export const cleanElementForExcalidraw = (
+  element: ServerElement,
+): Partial<ExcalidrawElement> => {
   const {
     createdAt,
     updatedAt,
@@ -55,32 +61,44 @@ export const cleanElementForExcalidraw = (element: ServerElement): Partial<Excal
     ...cleanElement
   } = element;
   return cleanElement as Partial<ExcalidrawElement>;
-}
+};
 
 // Helper function to validate and fix element binding data
-const validateAndFixBindings = (elements: Partial<ExcalidrawElement>[]): Partial<ExcalidrawElement>[] => {
-  const elementMap = new Map(elements.map(el => [el.id!, el]));
+const validateAndFixBindings = (
+  elements: Partial<ExcalidrawElement>[],
+): Partial<ExcalidrawElement>[] => {
+  const elementMap = new Map(elements.map((el) => [el.id!, el]));
 
-  return elements.map(element => {
+  return elements.map((element) => {
     const fixedElement = { ...element };
 
     // Validate and fix boundElements
     if (fixedElement.boundElements) {
       if (Array.isArray(fixedElement.boundElements)) {
-        fixedElement.boundElements = fixedElement.boundElements.filter((binding: any) => {
-          // Ensure binding has required properties
-          if (!binding || typeof binding !== 'object') return false;
-          if (!binding.id || !binding.type) return false;
+        fixedElement.boundElements = fixedElement.boundElements.filter(
+          (binding: any) => {
+            // Ensure binding has required properties
+            if (!binding || typeof binding !== "object") {
+              return false;
+            }
+            if (!binding.id || !binding.type) {
+              return false;
+            }
 
-          // Ensure the referenced element exists
-          const referencedElement = elementMap.get(binding.id);
-          if (!referencedElement) return false;
+            // Ensure the referenced element exists
+            const referencedElement = elementMap.get(binding.id);
+            if (!referencedElement) {
+              return false;
+            }
 
-          // Validate binding type
-          if (!['text', 'arrow'].includes(binding.type)) return false;
+            // Validate binding type
+            if (!["text", "arrow"].includes(binding.type)) {
+              return false;
+            }
 
-          return true;
-        });
+            return true;
+          },
+        );
 
         // Remove boundElements if empty
         if (fixedElement.boundElements.length === 0) {
@@ -93,7 +111,7 @@ const validateAndFixBindings = (elements: Partial<ExcalidrawElement>[]): Partial
     }
 
     // Validate and fix containerId
-    if (fixedElement.type === 'text' && fixedElement.containerId) {
+    if (fixedElement.type === "text" && fixedElement.containerId) {
       const containerElement = elementMap.get(fixedElement.containerId);
       if (!containerElement) {
         // Container doesn't exist, remove containerId
@@ -103,69 +121,82 @@ const validateAndFixBindings = (elements: Partial<ExcalidrawElement>[]): Partial
 
     return fixedElement;
   });
-}
+};
 
 const isImageElement = (element: Partial<ExcalidrawElement>): boolean => {
-  return element.type === 'image'
-}
+  return element.type === "image";
+};
 
 const isFreedrawElement = (element: Partial<ExcalidrawElement>): boolean => {
-  return element.type === 'freedraw'
-}
+  return element.type === "freedraw";
+};
 
 const isShapeContainerType = (type: string | undefined): boolean => {
-  return type === 'rectangle' || type === 'ellipse' || type === 'diamond'
-}
+  return type === "rectangle" || type === "ellipse" || type === "diamond";
+};
 
 const recenterBoundShapeTextElements = (
-  elements: Partial<ExcalidrawElement>[]
+  elements: Partial<ExcalidrawElement>[],
 ): Partial<ExcalidrawElement>[] => {
-  const elementMap = new Map(elements.map((el) => [el.id, el]))
+  const elementMap = new Map(elements.map((el) => [el.id, el]));
 
   return elements.map((element) => {
-    if (element.type !== 'text' || !element.containerId) {
-      return element
+    if (element.type !== "text" || !element.containerId) {
+      return element;
     }
 
-    const textElement = element as ExcalidrawElement & { type: 'text'; containerId: string; autoResize?: boolean }
-    const container = elementMap.get(textElement.containerId) as (ExcalidrawElement & { x: number; y: number; width: number; height: number }) | undefined
+    const textElement = element as ExcalidrawElement & {
+      type: "text";
+      containerId: string;
+      autoResize?: boolean;
+    };
+    const container = elementMap.get(textElement.containerId) as
+      | (ExcalidrawElement & {
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        })
+      | undefined;
     if (!container || !isShapeContainerType(container.type)) {
-      return element
+      return element;
     }
 
     if (textElement.autoResize === false) {
-      return element
+      return element;
     }
 
     if (
-      typeof container.x !== 'number' ||
-      typeof container.y !== 'number' ||
-      typeof container.width !== 'number' ||
-      typeof container.height !== 'number' ||
-      typeof textElement.width !== 'number' ||
-      typeof textElement.height !== 'number'
+      typeof container.x !== "number" ||
+      typeof container.y !== "number" ||
+      typeof container.width !== "number" ||
+      typeof container.height !== "number" ||
+      typeof textElement.width !== "number" ||
+      typeof textElement.height !== "number"
     ) {
-      return element
+      return element;
     }
 
     return {
       ...element,
       x: container.x + (container.width - textElement.width) / 2,
       y: container.y + (container.height - textElement.height) / 2,
-    }
-  })
-}
+    };
+  });
+};
 
-const normalizeImageElement = (element: Partial<ExcalidrawElement>): Partial<ExcalidrawElement> => {
-  const img = element as any
+const normalizeImageElement = (
+  element: Partial<ExcalidrawElement>,
+): Partial<ExcalidrawElement> => {
+  const img = element as any;
   return {
     ...img,
     angle: img.angle || 0,
-    strokeColor: img.strokeColor || 'transparent',
-    backgroundColor: img.backgroundColor || 'transparent',
-    fillStyle: img.fillStyle || 'solid',
+    strokeColor: img.strokeColor || "transparent",
+    backgroundColor: img.backgroundColor || "transparent",
+    fillStyle: img.fillStyle || "solid",
     strokeWidth: img.strokeWidth || 1,
-    strokeStyle: img.strokeStyle || 'solid',
+    strokeStyle: img.strokeStyle || "solid",
     roughness: img.roughness ?? 0,
     opacity: img.opacity ?? 100,
     groupIds: img.groupIds || [],
@@ -177,21 +208,23 @@ const normalizeImageElement = (element: Partial<ExcalidrawElement>): Partial<Exc
     boundElements: img.boundElements || null,
     link: img.link || null,
     locked: img.locked || false,
-    status: img.status || 'saved',
+    status: img.status || "saved",
     fileId: img.fileId,
     scale: img.scale || [1, 1],
-  }
-}
+  };
+};
 
-const normalizeFreedrawElement = (element: Partial<ExcalidrawElement>): Partial<ExcalidrawElement> => {
-  const freedraw = element as any
+const normalizeFreedrawElement = (
+  element: Partial<ExcalidrawElement>,
+): Partial<ExcalidrawElement> => {
+  const freedraw = element as any;
   return {
     ...freedraw,
     angle: freedraw.angle || 0,
-    backgroundColor: freedraw.backgroundColor || 'transparent',
-    fillStyle: freedraw.fillStyle || 'solid',
+    backgroundColor: freedraw.backgroundColor || "transparent",
+    fillStyle: freedraw.fillStyle || "solid",
     strokeWidth: freedraw.strokeWidth || 1,
-    strokeStyle: freedraw.strokeStyle || 'solid',
+    strokeStyle: freedraw.strokeStyle || "solid",
     roughness: freedraw.roughness ?? 1,
     opacity: freedraw.opacity ?? 100,
     groupIds: freedraw.groupIds || [],
@@ -207,22 +240,26 @@ const normalizeFreedrawElement = (element: Partial<ExcalidrawElement>): Partial<
     pressures: freedraw.pressures || [],
     simulatePressure: freedraw.simulatePressure ?? true,
     lastCommittedPoint: freedraw.lastCommittedPoint || null,
-  }
-}
+  };
+};
 
 // Helper: restore startBinding/endBinding/boundElements after convertToExcalidrawElements strips them
 const restoreBindings = (
   convertedElements: readonly any[],
-  originalElements: Partial<ExcalidrawElement>[]
+  originalElements: Partial<ExcalidrawElement>[],
 ): any[] => {
   const originalMap = new Map<string, any>();
   for (const el of originalElements) {
-    if (el.id) originalMap.set(el.id, el);
+    if (el.id) {
+      originalMap.set(el.id, el);
+    }
   }
 
   return convertedElements.map((el: any) => {
     const orig = originalMap.get(el.id);
-    if (!orig) return el;
+    if (!orig) {
+      return el;
+    }
 
     const patched = { ...el };
 
@@ -232,7 +269,10 @@ const restoreBindings = (
     if (orig.endBinding && !el.endBinding) {
       patched.endBinding = orig.endBinding;
     }
-    if (orig.boundElements && (!el.boundElements || el.boundElements.length === 0)) {
+    if (
+      orig.boundElements &&
+      (!el.boundElements || el.boundElements.length === 0)
+    ) {
       patched.boundElements = orig.boundElements;
     }
     if (orig.elbowed !== undefined && el.elbowed === undefined) {
@@ -244,8 +284,11 @@ const restoreBindings = (
 };
 
 const isPointList = (points: unknown): points is [number, number][] =>
-  Array.isArray(points) && points.length >= 2 && points.every(p =>
-    Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+  Array.isArray(points) &&
+  points.length >= 2 &&
+  points.every(
+    (p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]),
+  );
 
 // The skeleton converter is not idempotent, and every server scene passes
 // through it on every update. Text x/y is read as an alignment anchor
@@ -255,24 +298,31 @@ const isPointList = (points: unknown): points is [number, number][] =>
 // converter still measures text and expands labels and bindings.
 const preserveCallerGeometry = (
   convertedElements: readonly any[],
-  originalElements: Partial<ExcalidrawElement>[]
+  originalElements: Partial<ExcalidrawElement>[],
 ): any[] => {
-  const originalMap = new Map<string, any>()
+  const originalMap = new Map<string, any>();
   for (const el of originalElements) {
-    if (el.id) originalMap.set(el.id, el)
+    if (el.id) {
+      originalMap.set(el.id, el);
+    }
   }
 
   return convertedElements.map((el: any) => {
-    const orig = originalMap.get(el.id)
-    if (!orig) return el
+    const orig = originalMap.get(el.id);
+    if (!orig) {
+      return el;
+    }
 
     // Shape labels are recentred afterwards; arrow labels keep their place.
-    if (el.type === 'text') {
-      return { ...el, x: orig.x, y: orig.y }
+    if (el.type === "text") {
+      return { ...el, x: orig.x, y: orig.y };
     }
-    if ((el.type === 'arrow' || el.type === 'line') && isPointList(orig.points)) {
-      const xs = orig.points.map((p: [number, number]) => p[0])
-      const ys = orig.points.map((p: [number, number]) => p[1])
+    if (
+      (el.type === "arrow" || el.type === "line") &&
+      isPointList(orig.points)
+    ) {
+      const xs = orig.points.map((p: [number, number]) => p[0]);
+      const ys = orig.points.map((p: [number, number]) => p[1]);
       const preserved = {
         ...el,
         x: orig.x,
@@ -280,18 +330,24 @@ const preserveCallerGeometry = (
         points: orig.points.map((p: [number, number]) => [p[0], p[1]]),
         width: Math.max(...xs) - Math.min(...xs),
         height: Math.max(...ys) - Math.min(...ys),
-      }
+      };
       // Fixed-segment indexes and hidden endpoint segments belong to these points.
-      if (el.type === 'arrow' && orig.elbowed === true) {
-        for (const key of ['fixedSegments', 'startIsSpecial', 'endIsSpecial'] as const) {
-          if (orig[key] !== undefined) preserved[key] = orig[key]
+      if (el.type === "arrow" && orig.elbowed === true) {
+        for (const key of [
+          "fixedSegments",
+          "startIsSpecial",
+          "endIsSpecial",
+        ] as const) {
+          if (orig[key] !== undefined) {
+            preserved[key] = orig[key];
+          }
         }
       }
-      return preserved
+      return preserved;
     }
-    return el
-  })
-}
+    return el;
+  });
+};
 
 // The converter gives a shorthand label a random id unless the label carries
 // one. A server update merged onto a tab's element carries both the shorthand
@@ -300,52 +356,70 @@ const preserveCallerGeometry = (
 // or a stable `<container-id>-label` (the id exports use), so conversion
 // replaces the label instead. The converter re-adds the text binding itself.
 const withStableLabelIds = (
-  elements: Partial<ExcalidrawElement>[]
+  elements: Partial<ExcalidrawElement>[],
 ): Partial<ExcalidrawElement>[] =>
   elements.map((element: any) => {
-    if (!element.id || element.type === 'text' || !element.label?.text) return element
-    const bindings = Array.isArray(element.boundElements) ? element.boundElements : []
-    const boundText = bindings.find((b: any) => b?.type === 'text')
+    if (!element.id || element.type === "text" || !element.label?.text) {
+      return element;
+    }
+    const bindings = Array.isArray(element.boundElements)
+      ? element.boundElements
+      : [];
+    const boundText = bindings.find((b: any) => b?.type === "text");
     return {
       ...element,
-      label: { ...element.label, id: element.label.id ?? boundText?.id ?? `${element.id}-label` },
-      boundElements: bindings.filter((b: any) => b?.type !== 'text'),
-    }
-  })
+      label: {
+        ...element.label,
+        id: element.label.id ?? boundText?.id ?? `${element.id}-label`,
+      },
+      boundElements: bindings.filter((b: any) => b?.type !== "text"),
+    };
+  });
 
-const isFrame = (element: Partial<ExcalidrawElement>): element is Partial<Extract<ExcalidrawElement, { type: 'frame' | 'magicframe' }>> =>
-  element.type === 'frame' || element.type === 'magicframe'
+const isFrame = (
+  element: Partial<ExcalidrawElement>,
+): element is Partial<
+  Extract<ExcalidrawElement, { type: "frame" | "magicframe" }>
+> => element.type === "frame" || element.type === "magicframe";
 
 // A successful restore may still silently discard an unsupported or tiny
 // element. Never allow that partial scene to become a full-sync baseline.
 export const assertScenePreserved = (
   expected: readonly Partial<ExcalidrawElement>[],
-  actual: readonly Partial<ExcalidrawElement>[]
+  actual: readonly Partial<ExcalidrawElement>[],
 ): void => {
-  const active = actual.filter(el => !el.isDeleted)
-  const actualById = new Map(active.map(el => [el.id, el]))
-  if (actualById.size !== active.length) throw new Error('Scene restore produced duplicate element IDs')
+  const active = actual.filter((el) => !el.isDeleted);
+  const actualById = new Map(active.map((el) => [el.id, el]));
+  if (actualById.size !== active.length) {
+    throw new Error("Scene restore produced duplicate element IDs");
+  }
   for (const element of expected) {
-    if (element.isDeleted) continue
-    const restored = actualById.get(element.id)
+    if (element.isDeleted) {
+      continue;
+    }
+    const restored = actualById.get(element.id);
     if (!restored || restored.type !== element.type) {
-      throw new Error(`Scene restore lost element ${element.id} (${element.type})`)
+      throw new Error(
+        `Scene restore lost element ${element.id} (${element.type})`,
+      );
     }
     if ((element.frameId ?? null) !== (restored.frameId ?? null)) {
-      throw new Error(`Scene restore changed frame membership for ${element.id}`)
+      throw new Error(
+        `Scene restore changed frame membership for ${element.id}`,
+      );
     }
     if (element.frameId && !isFrame(actualById.get(element.frameId) || {})) {
-      throw new Error(`Missing frame ${element.frameId} for ${element.id}`)
+      throw new Error(`Missing frame ${element.frameId} for ${element.id}`);
     }
     if (isFrame(element) && isFrame(restored)) {
-      for (const key of ['x', 'y', 'width', 'height', 'name'] as const) {
+      for (const key of ["x", "y", "width", "height", "name"] as const) {
         if (element[key] !== undefined && element[key] !== restored[key]) {
-          throw new Error(`Scene restore changed frame ${element.id}.${key}`)
+          throw new Error(`Scene restore changed frame ${element.id}.${key}`);
         }
       }
     }
   }
-}
+};
 
 export const prepareServerScene = (
   elements: readonly Partial<ExcalidrawElement>[],
@@ -359,57 +433,78 @@ export const prepareServerScene = (
      * container may have been resized through the API and its label would
      * otherwise keep the old line breaks — pass `true`.
      */
-    refreshDimensions?: boolean
-  } = {}
+    refreshDimensions?: boolean;
+  } = {},
 ): ExcalidrawElement[] => {
-  if (!Array.isArray(elements)) throw new Error('Expected a scene element array')
-  const ids = new Set<string>()
+  if (!Array.isArray(elements)) {
+    throw new Error("Expected a scene element array");
+  }
+  const ids = new Set<string>();
   for (const element of elements) {
-    if (!element || typeof element.id !== 'string' || !element.id ||
-        typeof element.type !== 'string' || ids.has(element.id)) {
-      throw new Error('Scene contains an invalid or duplicate element ID')
+    if (
+      !element ||
+      typeof element.id !== "string" ||
+      !element.id ||
+      typeof element.type !== "string" ||
+      ids.has(element.id)
+    ) {
+      throw new Error("Scene contains an invalid or duplicate element ID");
     }
-    ids.add(element.id)
-    if (!Number.isFinite(element.x) || !Number.isFinite(element.y) ||
-        (element.width !== undefined && !Number.isFinite(element.width)) ||
-        (element.height !== undefined && !Number.isFinite(element.height))) {
-      throw new Error(`Scene contains invalid coordinates for ${element.id}`)
+    ids.add(element.id);
+    if (
+      !Number.isFinite(element.x) ||
+      !Number.isFinite(element.y) ||
+      (element.width !== undefined && !Number.isFinite(element.width)) ||
+      (element.height !== undefined && !Number.isFinite(element.height))
+    ) {
+      throw new Error(`Scene contains invalid coordinates for ${element.id}`);
     }
   }
 
-  const validated = validateAndFixBindings([...elements])
+  const validated = validateAndFixBindings([...elements]);
   // Native frames express membership through the children's frameId. The
   // skeleton converter instead requires frame.children and recalculates bounds.
   const skeletons = withStableLabelIds(
-    validated.filter(el => !isFrame(el) && !isImageElement(el) && !isFreedrawElement(el))
-  )
+    validated.filter(
+      (el) => !isFrame(el) && !isImageElement(el) && !isFreedrawElement(el),
+    ),
+  );
   const converted = preserveCallerGeometry(
     restoreBindings(
       convertToExcalidrawElements(skeletons as any, { regenerateIds: false }),
-      skeletons
+      skeletons,
     ),
-    skeletons
-  )
-  const convertedById = new Map(converted.map(el => [el.id, el]))
-  const generatedText = new Map<string, ExcalidrawElement[]>()
+    skeletons,
+  );
+  const convertedById = new Map(converted.map((el) => [el.id, el]));
+  const generatedText = new Map<string, ExcalidrawElement[]>();
   for (const element of converted) {
-    if (!ids.has(element.id) && element.type === 'text' && element.containerId) {
-      const siblings = generatedText.get(element.containerId) || []
-      siblings.push(element)
-      generatedText.set(element.containerId, siblings)
+    if (
+      !ids.has(element.id) &&
+      element.type === "text" &&
+      element.containerId
+    ) {
+      const siblings = generatedText.get(element.containerId) || [];
+      siblings.push(element);
+      generatedText.set(element.containerId, siblings);
     }
   }
 
   // Preserve the original stacking order, including interleaved frames, images
   // and freehand strokes. Newly expanded labels sit beside their container.
-  const ordered = validated.flatMap(element => {
-    const next = isFrame(element) ? element
-      : isImageElement(element) ? normalizeImageElement(element)
-      : isFreedrawElement(element) ? normalizeFreedrawElement(element)
-      : convertedById.get(element.id)
-    if (!next) throw new Error(`Scene conversion lost element ${element.id}`)
-    return [next, ...(generatedText.get(element.id!) || [])]
-  })
+  const ordered = validated.flatMap((element) => {
+    const next = isFrame(element)
+      ? element
+      : isImageElement(element)
+      ? normalizeImageElement(element)
+      : isFreedrawElement(element)
+      ? normalizeFreedrawElement(element)
+      : convertedById.get(element.id);
+    if (!next) {
+      throw new Error(`Scene conversion lost element ${element.id}`);
+    }
+    return [next, ...(generatedText.get(element.id!) || [])];
+  });
   // Excalidraw's `refreshTextDimensions` re-wraps `element.text`, not
   // `originalText` — and `text` already carries the line breaks computed for the
   // previous container size, as real newlines. Wrapping an already-wrapped
@@ -417,22 +512,25 @@ export const prepareServerScene = (
   // cannot re-flow a label after its container is resized. Feeding the label
   // its unwrapped source first is what makes the re-flow actually happen.
   const reflowed = opts.refreshDimensions
-    ? ordered.map(element => {
+    ? ordered.map((element) => {
         const label = element as Partial<ExcalidrawElement> & {
-          containerId?: string | null
-          originalText?: string
-        }
-        return label?.containerId && typeof label.originalText === 'string'
+          containerId?: string | null;
+          originalText?: string;
+        };
+        return label?.containerId && typeof label.originalText === "string"
           ? { ...element, text: label.originalText }
-          : element
+          : element;
       })
-    : ordered
+    : ordered;
 
   const restored = restoreElements(
     recenterBoundShapeTextElements(reflowed) as ExcalidrawElement[],
     null,
-    { repairBindings: true, refreshDimensions: opts.refreshDimensions ?? false }
-  )
-  assertScenePreserved(elements, restored)
-  return restored
-}
+    {
+      repairBindings: true,
+      refreshDimensions: opts.refreshDimensions ?? false,
+    },
+  );
+  assertScenePreserved(elements, restored);
+  return restored;
+};
