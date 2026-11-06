@@ -8,6 +8,42 @@ import httpProxy from 'http-proxy';
 import { chromium, expect } from 'playwright/test';
 import { startWorkspace, stopWorkspace, request, mcp } from './helpers.mjs';
 
+test('library grid fits five canvases across desktop and keeps filtered cards compact', { timeout: 30_000 }, async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-grid-'));
+  let instance, browser;
+  try {
+    instance = await startWorkspace(directory);
+    for (let i = 0; i < 5; i++) {
+      await request(`${instance.url}/api/canvases`, 'POST', { name: `Grid canvas ${i}` });
+    }
+    browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true });
+    const page = await browser.newPage({ viewport: { width: 1740, height: 1000 } });
+    await page.goto(instance.url);
+    const cards = page.locator('.canvas-card');
+    await expect(cards).toHaveCount(5);
+    for (const width of [1740, 2000, 1440, 1024, 768, 601, 600, 375]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const boxes = await cards.evaluateAll(nodes => nodes.map(node => {
+        const { x, y, width, bottom } = node.getBoundingClientRect();
+        return { x, y, width, bottom };
+      }));
+      if (width >= 1740) {
+        assert.ok(boxes.every(box => box.y === boxes[0].y), `Five cards should fit in one row at ${width}px: ${JSON.stringify(boxes)}`);
+      }
+      if (width >= 1024) assert.ok(boxes.at(-1).bottom <= 1000, `Five cards should fit on screen at ${width}px`);
+      assert.ok(await page.locator('html').evaluate(node => node.scrollWidth <= node.ownerDocument.defaultView.innerWidth), `No horizontal overflow at ${width}px`);
+      const originalWidth = boxes[0].width;
+      await page.getByRole('searchbox', { name: 'Search canvases' }).fill('Grid canvas 0');
+      await expect(cards).toHaveCount(1);
+      const filteredBox = await cards.boundingBox();
+      assert.ok(Math.abs(filteredBox.width - originalWidth) < 1, `Filtering should preserve card width at ${width}px`);
+      assert.ok(Math.abs(filteredBox.x - boxes[0].x) < 1, `Cards should stay aligned at ${width}px`);
+      await page.getByRole('searchbox', { name: 'Search canvases' }).fill('');
+      await expect(cards).toHaveCount(5);
+    }
+  } finally { await browser?.close(); await stopWorkspace(instance); fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('browser creation, immediate navigation saves, independent live scenes, rename, archive, import, and responsive layout', { timeout: 120_000 }, async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-browser-'));
   let instance, browser;
